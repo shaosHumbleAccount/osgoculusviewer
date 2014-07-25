@@ -111,6 +111,9 @@ void OculusViewConfig::configure(osgViewer::View& view) const
 	// If screenNum has not been set, reset it to 0.
 	if (si.screenNum < 0) si.screenNum = 0;
 
+	//test by Shao
+	si.displayNum = _displayNum;
+	si.screenNum = _screenNum;
 	unsigned int width, height;
 	wsi->getScreenResolution(si, width, height);
 
@@ -134,19 +137,19 @@ void OculusViewConfig::configure(osgViewer::View& view) const
 		return;
 	}
 
-	osg::ref_ptr<osg::Camera> camera = view.getCamera();
-	camera->setName("Main");
+	_main_camera = view.getCamera();
+	_main_camera->setName("Main");
 	// Disable scene rendering for main camera
-	camera->setCullMask(~m_sceneNodeMask);
-	camera->setGraphicsContext(gc);
+	_main_camera->setCullMask(~m_sceneNodeMask);
+	_main_camera->setGraphicsContext(gc);
 	// Use full view port
-	camera->setViewport(new osg::Viewport(0, 0, traits->width, traits->height));
+	_main_camera->setViewport(new osg::Viewport(0, 0, traits->width, traits->height));
 	// Disable automatic computation of near and far plane on main camera, will propagate to slave cameras
-	camera->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
+	_main_camera->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
 	const int textureWidth  = m_device->scaleFactor() * m_device->hScreenResolution()/2;
 	const int textureHeight = m_device->scaleFactor() * m_device->vScreenResolution();
 	// master projection matrix
-	camera->setProjectionMatrix(m_device->projectionCenterMatrix());
+	_main_camera->setProjectionMatrix(m_device->projectionCenterMatrix());
 	// Create textures for RTT cameras
 	osg::ref_ptr<osg::Texture2D> textureLeft = new osg::Texture2D;
 	textureLeft->setTextureSize( textureWidth, textureHeight );
@@ -154,7 +157,7 @@ void OculusViewConfig::configure(osgViewer::View& view) const
 	osg::ref_ptr<osg::Texture2D> textureRight = new osg::Texture2D;
 	textureRight->setTextureSize( textureWidth, textureHeight );
 	textureRight->setInternalFormat( GL_RGBA );
-	// Create RTT cameras and attach textures
+	// Create RTT (Rendering to Texture) cameras and attach textures 
 	osg::ref_ptr<osg::Camera> cameraRTTLeft = createRTTCamera(textureLeft, gc);
 	osg::ref_ptr<osg::Camera> cameraRTTRight = createRTTCamera(textureRight, gc);
 	cameraRTTLeft->setName("LeftRTT");
@@ -216,10 +219,32 @@ void OculusViewConfig::configure(osgViewer::View& view) const
 	view.setName("Oculus");
 	// Connect main camera to node callback that get HMD orientation
 	if (m_useOrientations) {
-		camera->setDataVariance(osg::Object::DYNAMIC);
-		camera->setUpdateCallback(new OculusViewConfigOrientationCallback(cameraRTTLeft, cameraRTTRight, m_device));
+		_main_camera->setDataVariance(osg::Object::DYNAMIC);
+		_callback = new OculusViewConfigOrientationCallback(cameraRTTLeft, cameraRTTRight, m_device);
+		_main_camera->setUpdateCallback(_callback);
 	}
 }
+
+osg::Quat OculusViewConfig::getLastRotation()
+{
+	osg::Quat quat;
+	if(_callback)
+	{
+		quat = _callback->_lastRot;
+	}
+	return quat;
+}
+
+osg::Matrixd OculusViewConfig::getLastViewOffset()
+{
+	osg::Matrixd mat = osg::Matrixd::identity();
+	if(_callback)
+	{
+		mat = _callback->_lastViewOffset;
+	}
+	return mat;
+}
+
 
 void OculusViewConfigOrientationCallback::operator() (osg::Node* node, osg::NodeVisitor* nv)
 {
@@ -227,11 +252,13 @@ void OculusViewConfigOrientationCallback::operator() (osg::Node* node, osg::Node
 	osg::View* view = mainCamera->getView();
 
 	if (view) {
-		osg::Quat orient = m_device.get()->getOrientation();
+		_lastRot = m_device.get()->getOrientation();
 		// Nasty hack to update the view offset for each of the slave cameras
 		// There doesn't seem to be an accessor for this, fortunately the offsets are public
-		view->findSlaveForCamera(m_cameraRTTLeft.get())->_viewOffset.setRotate(orient);
-		view->findSlaveForCamera(m_cameraRTTRight.get())->_viewOffset.setRotate(orient);
+		view->findSlaveForCamera(m_cameraRTTLeft.get())->_viewOffset.setRotate(_lastRot);
+		view->findSlaveForCamera(m_cameraRTTRight.get())->_viewOffset.setRotate(_lastRot);
+
+		_lastViewOffset = view->findSlaveForCamera(m_cameraRTTLeft.get())->_viewOffset;
 	}
 
 	traverse(node, nv);

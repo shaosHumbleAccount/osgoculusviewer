@@ -11,6 +11,18 @@
 #include <osgViewer/View>
 #include "oculusdevice.h"
 
+class OculusViewConfigOrientationCallback : public osg::NodeCallback {
+	public:
+		OculusViewConfigOrientationCallback(osg::ref_ptr<osg::Camera> rttLeft, osg::ref_ptr<osg::Camera> rttRight, osg::observer_ptr<OculusDevice> device) : m_cameraRTTLeft(rttLeft), m_cameraRTTRight(rttRight), m_device(device) {};
+		virtual void operator() (osg::Node* node, osg::NodeVisitor* nv);
+		osg::Quat _lastRot;
+		osg::Matrixd _lastViewOffset;
+	protected:
+		osg::observer_ptr<osg::Camera> m_cameraRTTLeft, m_cameraRTTRight;
+		osg::observer_ptr<OculusDevice> m_device;
+};
+
+
 class OculusViewConfig : public osgViewer::ViewConfig {
 	public:
 		OculusViewConfig() : osgViewer::ViewConfig(),
@@ -26,6 +38,8 @@ class OculusViewConfig : public osgViewer::ViewConfig {
 			m_sceneNodeMask(0x1),
 			m_device(0) {
 			m_device = new OculusDevice;
+			_screenNum = 0;
+		    _displayNum = 0;
 		}
 		void setEnableOrientationsFromHMD(bool useOrientations) { m_useOrientations = useOrientations; }
 		void setEnableChromaticAberrationCorrection(bool correctionEnabled) { m_useChromaticAberrationCorrection = correctionEnabled; }
@@ -38,6 +52,12 @@ class OculusViewConfig : public osgViewer::ViewConfig {
 		void setCustomScaleFactor(const float& customScaleFactor) { m_useCustomScaleFactor = true; m_customScaleFactor = customScaleFactor; }
 		void setSceneNodeMask(osg::Node::NodeMask nodeMask) { m_sceneNodeMask = nodeMask; }
 		virtual void configure(osgViewer::View& view) const;
+
+		void setScreenNum(int screenNum){_screenNum = screenNum;}
+		void setDisplayNum(int displayNum){_displayNum = displayNum;}
+
+		osg::Quat getLastRotation();
+		osg::Matrixd getLastViewOffset();
 	protected:
 		~OculusViewConfig() {};
 
@@ -59,15 +79,13 @@ class OculusViewConfig : public osgViewer::ViewConfig {
 		osg::Node::NodeMask m_sceneNodeMask;
 
 		osg::ref_ptr<OculusDevice> m_device;
+
+		int _screenNum;
+		int _displayNum;
+
+		mutable osg::ref_ptr<osg::Camera> _main_camera;
+		mutable OculusViewConfigOrientationCallback* _callback;
 };
 
-class OculusViewConfigOrientationCallback :  public osg::NodeCallback {
-	public:
-		OculusViewConfigOrientationCallback(osg::ref_ptr<osg::Camera> rttLeft, osg::ref_ptr<osg::Camera> rttRight, osg::observer_ptr<OculusDevice> device) : m_cameraRTTLeft(rttLeft), m_cameraRTTRight(rttRight), m_device(device) {};
-		virtual void operator() (osg::Node* node, osg::NodeVisitor* nv);
-	protected:
-		osg::observer_ptr<osg::Camera> m_cameraRTTLeft, m_cameraRTTRight;
-		osg::observer_ptr<OculusDevice> m_device;
-};
 
 #endif /* _OSG_OCULUSVIEWCONFIG_H_ */

@@ -13,6 +13,7 @@
 #include "oculuseventhandler.h"
 #include "oculusviewconfig.h"
 
+
 int main( int argc, char** argv )
 {
 	// use an ArgumentParser object to manage the program arguments.
@@ -21,7 +22,7 @@ int main( int argc, char** argv )
 	osg::ref_ptr<osg::Node> loadedModel = osgDB::readNodeFiles(arguments);
 
 	// if not loaded assume no arguments passed in, try use default cow model instead.
-	if (!loadedModel) loadedModel = osgDB::readNodeFile("cow.osgt");
+	if (!loadedModel) loadedModel = osgDB::readNodeFile("C:\\kb\\projects\\point_gui\\trunk\\res\\robot_model\\LBR4-DLR\\dlr-lwr-3.iv");
 
 	// Still no loaded model, then exit
 	if (!loadedModel) return 0;
@@ -32,6 +33,7 @@ int main( int argc, char** argv )
 		 
 	// Create Oculus View Config
 	osg::ref_ptr<OculusViewConfig> oculusViewConfig = new OculusViewConfig;
+	oculusViewConfig->setScreenNum(1);
 	// Set the node mask used for scene
 	oculusViewConfig->setSceneNodeMask(sceneNodeMask);
 	// Create viewer
@@ -44,6 +46,15 @@ int main( int argc, char** argv )
 	viewer.apply(oculusViewConfig);
 	// Add loaded model to viewer
 	viewer.setSceneData(loadedModel);
+
+	viewer.setUpViewOnSingleScreen(1u);
+
+	osgGA::TrackballManipulator* trackballCamMan = new osgGA::TrackballManipulator;
+	trackballCamMan->setTransformation(osg::Vec3d(2,2,2),
+                                       osg::Vec3d(0,0,0),
+                                       osg::Vec3d(0,0,1));
+    viewer.setCameraManipulator( trackballCamMan, false );
+
 	// Start Viewer
 	return viewer.run();
 }
